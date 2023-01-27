@@ -70,51 +70,38 @@ app.layout = html.Div(
         html.H4("Draw a shape, then modify it"),
         dcc.Graph(id="fig-image", figure=fig, config=config,style={'width': '150vh', 'height': '150vh',"border":"1px black solid"}),
         dcc.Markdown("Characteristics of shapes"),
-        # html.Pre(id="annotations-pre"),
-        html.Button(id='button', n_clicks=0, children='Retrieve Data'),
+        html.Pre(id="annotations-pre"),
         dash_table.DataTable(id='canvaas-table',
-                            style_cell={'textAlign': 'left'},
-                            columns=[{"name": i, "id": i} for i in columns]),
+                             style_cell={'textAlign': 'left'},
+                             columns=[{"name": i, "id": i} for i in columns]),
     ]
 )
 
+
 @app.callback(
-    Output('canvaas-table', 'data'), Output('canvaas-table', 'columns'),
-    [Input("fig-image", "relayoutData"), Input("button", "n_clicks")],
-    prevent_initial_call=True,
+    Output('canvaas-table', 'data'),
+    [Input("fig-image", "relayoutData")],
+    prevent_initial_call=True
 )
-def on_new_annotation(string, button_clicks):
-    if button_clicks is None:
-        return dash.no_update, dash.no_update
-    else:
-        if isinstance(string, str):
-            string = json.loads(string)
-            if "shapes" in string:
-                data = string['shapes']
-                data = pd.DataFrame.from_dict(data)
-                data2 = pd.DataFrame()
-                ReadingSection = pd.DataFrame()
-                for index, row in data.iterrows():
-                    y1 = int(row['y0'])
-                    y2 = int(row['y1'])
-                    x1 = int(row['x0'])
-                    x2 = int(row['x1'])
-                    ReadingSection = img[y1:y2, x1:x2]
-                    text = pytesseract.image_to_string(ReadingSection, config='--psm 6')
-                    dfReadingSection = pd.DataFrame(StringIO(text))
-                    data2 = data2.append(dfReadingSection)
-                data2 = data2.to_dict(orient='records')
-                columns = [{"name": i, "id": i} for i in data2.columns]
-                return data2, columns
-                
-            else: #"shapes" not in string:
-                text = pytesseract.image_to_string(img, config='--psm 6')
-                data = pd.DataFrame(StringIO(text))
-                columns = [{"name": i, "id": i} for i in data.columns]
-                return data, columns
-
-
+def update_table(relayout_data):
+    if 'shapes' in relayout_data:
+        shapes = relayout_data['shapes']
+        data = []
+        for shape in shapes:
+            shape_data = {}
+            shape_data['type'] = shape['type']
+            shape_data['left'] = shape['x0']
+            shape_data['top'] = shape['y0']
+            shape_data['width'] = shape['x1'] - shape['x0']
+            shape_data['height'] = shape['y1'] - shape['y0']
+            shape_data['scaleX'] = shape.get('scaleX', None)
+            shape_data['strokeWidth'] = shape.get('strokeWidth', None)
+            data.append(shape_data)
+        return data
     return dash.no_update
+
+
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)
