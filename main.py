@@ -70,43 +70,50 @@ app.layout = html.Div(
         html.H4("Draw a shape, then modify it"),
         dcc.Graph(id="fig-image", figure=fig, config=config,style={'width': '150vh', 'height': '150vh',"border":"1px black solid"}),
         dcc.Markdown("Characteristics of shapes"),
-        html.Pre(id="annotations-pre"),
-        #dash_table.DataTable(id='canvaas-table',
-        #                     style_cell={'textAlign': 'left'},
-        #                     columns=[{"name": i, "id": i} for i in columns]),
+        # html.Pre(id="annotations-pre"),
+        html.Button(id='button', n_clicks=0, children='Retrieve Data'),
+        dash_table.DataTable(id='canvaas-table',
+                            style_cell={'textAlign': 'left'},
+                            columns=[{"name": i, "id": i} for i in columns]),
     ]
 )
 
 @app.callback(
-    Output('annotations-pre', 'children'),
-    #Output('canvaas-table', 'data'),
-    Input("fig-image", "relayoutData"),
+    Output('canvaas-table', 'data'), Output('canvaas-table', 'columns'),
+    [Input("fig-image", "relayoutData"), Input("button", "n_clicks")],
     prevent_initial_call=True,
 )
-def on_new_annotation(string):
-    #for key in relayout_data:
-    if "shapes" in string:
-            print (string)
-            data=string['shapes']
-            print (data)
-            data = pd.DataFrame.from_dict(data)
-            print(data)
+def on_new_annotation(string, button_clicks):
+    if button_clicks is None:
+        return dash.no_update, dash.no_update
+    else:
+        if isinstance(string, str):
+            string = json.loads(string)
+            if "shapes" in string:
+                data = string['shapes']
+                data = pd.DataFrame.from_dict(data)
+                data2 = pd.DataFrame()
+                ReadingSection = pd.DataFrame()
+                for index, row in data.iterrows():
+                    y1 = int(row['y0'])
+                    y2 = int(row['y1'])
+                    x1 = int(row['x0'])
+                    x2 = int(row['x1'])
+                    ReadingSection = img[y1:y2, x1:x2]
+                    text = pytesseract.image_to_string(ReadingSection, config='--psm 6')
+                    dfReadingSection = pd.DataFrame(StringIO(text))
+                    data2 = data2.append(dfReadingSection)
+                data2 = data2.to_dict(orient='records')
+                columns = [{"name": i, "id": i} for i in data2.columns]
+                return data2, columns
+                
+            else: #"shapes" not in string:
+                text = pytesseract.image_to_string(img, config='--psm 6')
+                data = pd.DataFrame(StringIO(text))
+                columns = [{"name": i, "id": i} for i in data.columns]
+                return data, columns
 
-            data2 = pd.DataFrame()
-            ReadingSection = pd.DataFrame()
-            for index, row in data.iterrows():
-                y1 = int(row['y0'])
-                y2 = int(row['y1'])
-                x1 = int(row['x0'])
-                x2 = int(row['x1'])
-                ReadingSection = img[y1:y2, x1:x2]
-                text = pytesseract.image_to_string(ReadingSection, config='--psm 6')
-                dfReadingSection = pd.DataFrame(StringIO(text))
-                # dfReadingSection = dfReadingSection[0].str.split(" ", expand=True)
-                data2 = data2.append(dfReadingSection)
-                print(data2)
-            data2 = data2.to_dict(orient='records')
-            return json.dumps(data2, indent=2)
+
     return dash.no_update
 
 if __name__ == "__main__":
